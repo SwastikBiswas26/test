@@ -21,8 +21,28 @@ export default function App() {
   const [showGiftStage, setShowGiftStage] = useState(false);
 
   const sisterRef = useRef(null);
+  const brotherRef = useRef(null);
+  const maxDistanceRef = useRef(0);
   const targetXRef = useRef(0);
   const currentXRef = useRef(0);
+
+  // Recalculate exact pixel distance between Sister and Brother on resize / load
+  const updateMaxDistance = () => {
+    if (sisterRef.current && brotherRef.current) {
+      const sisterRect = sisterRef.current.getBoundingClientRect();
+      const brotherRect = brotherRef.current.getBoundingClientRect();
+      
+      // Calculate distance needed for Sister to reach/touch Brother's position
+      const distance = brotherRect.left - sisterRect.left;
+      maxDistanceRef.current = Math.max(0, distance);
+    }
+  };
+
+  useEffect(() => {
+    updateMaxDistance();
+    window.addEventListener("resize", updateMaxDistance);
+    return () => window.removeEventListener("resize", updateMaxDistance);
+  }, [showNameSetup]);
 
   // Smooth Interpolation (LERP Loop) for 60 FPS motion
   useEffect(() => {
@@ -49,19 +69,21 @@ export default function App() {
     e.preventDefault();
     if (sisterName.trim() && brotherName.trim()) {
       setShowNameSetup(false);
+      setTimeout(updateMaxDistance, 100);
     }
   };
 
   const handleWebcamMove = (percentageX) => {
     if (tied || showNameSetup) return;
-    const maxDistance = window.innerWidth * 0.35;
-    targetXRef.current = (percentageX / 100) * maxDistance;
+    // Map webcam movement percentage (0 - 100) directly to exact touch distance
+    targetXRef.current = (percentageX / 100) * maxDistanceRef.current;
   };
 
   const handleReachBrother = () => {
     if (!tied && !showNameSetup) {
       setTied(true);
-      targetXRef.current = window.innerWidth * 0.35;
+      // Lock sister position right next to brother upon arrival
+      targetXRef.current = maxDistanceRef.current;
 
       confetti({
         particleCount: 120,
@@ -141,7 +163,7 @@ export default function App() {
           <p style={styles.subtitle}>
             {tied
               ? "Rakhi Tied! 🎉"
-              : "Move your index finger to walk over and tie the Rakhi!"}
+              : "Move your index finger across screen to make Sister reach Brother!"}
           </p>
         </div>
         <WebcamTracker
@@ -167,6 +189,7 @@ export default function App() {
             <div style={styles.threadZone} />
 
             <Stickman
+              containerRef={brotherRef}
               name={brotherName}
               strokeColor="#0984e3"
               isTied={tied}
