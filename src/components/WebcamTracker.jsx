@@ -1,140 +1,149 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { Hands } from "@mediapipe/hands";
+import { Camera } from "@mediapipe/camera_utils";
+import { Camera as CameraIcon, CameraOff } from "lucide-react";
 
 export default function WebcamTracker({ onMove, onReachBrother, tied }) {
   const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const tiedRef = useRef(tied);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    tiedRef.current = tied;
+    let camera = null;
+    let hands = null;
+
+    const initTracker = async () => {
+      try {
+        // 1. Initialize MediaPipe Hands optimized for mobile performance
+        hands = new Hands({
+          locateFile: (file) =>
+            `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+        });
+
+        hands.setOptions({
+          maxNumHands: 1,
+          modelComplexity: 0, // 0 = Fast performance for mobile CPUs
+          minDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.5,
+        });
+
+        hands.onResults((results) => {
+          if (tied) return;
+
+          if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+            const landmarks = results.multiHandLandmarks[0];
+            const indexFingerTip = landmarks[8]; // Landmark 8 is Index Finger Tip
+
+            if (indexFingerTip) {
+              // Flip X coordinates (1 - x) to create a natural mirror effect
+              const mirroredX = 1 - indexFingerTip.x;
+              const percentageX = Math.min(Math.max(mirroredX * 100, 0), 100);
+
+              onMove(percentageX);
+
+              // Trigger Rakhi completion when hand moves across 75% of screen width
+              if (percentageX >= 75) {
+                onReachBrother();
+              }
+            }
+          }
+        });
+
+        // 2. Request Mobile-Friendly Camera Stream (640x480 max resolution)
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: "user",
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+              frameRate: { ideal: 30, max: 30 },
+            },
+          });
+
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            
+            // Wait for video metadata to load before starting MediaPipe Camera Loop
+            videoRef.current.onloadedmetadata = () => {
+              videoRef.current.play();
+              setCameraActive(true);
+
+              camera = new Camera(videoRef.current, {
+                onFrame: async () => {
+                  if (videoRef.current) {
+                    await hands.send({ image: videoRef.current });
+                  }
+                },
+                width: 640,
+                height: 480,
+              });
+              camera.start();
+            };
+          }
+        } else {
+          setErrorMsg("Camera access not supported or blocked (Requires HTTPS).");
+        }
+      } catch (err) {
+        console.error("Webcam Error:", err);
+        setErrorMsg("Camera permission denied or unavailable.");
+      }
+    };
+
+    initTracker();
+
+    return () => {
+      if (camera) camera.stop();
+      if (hands) hands.close();
+      if (videoRef.current && videoRef.current.srcObject) {
+        const tracks = videoRef.current.srcObject.getTracks();
+        tracks.forEach((track) => track.stop());
+      }
+    };
   }, [tied]);
 
-  useEffect(() => {
-    const HandsClass = window.Hands;
-    const CameraClass = window.Camera;
-
-    if (!HandsClass || !CameraClass) {
-      console.error("MediaPipe Hands script not loaded");
-      return;
-    }
-
-    const hands = new HandsClass({
-      locateFile: (file) =>
-        `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`,
-    });
-
-    hands.setOptions({
-      maxNumHands: 1,
-      modelComplexity: 1,
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.6,
-    });
-
-    hands.onResults((results) => {
-      if (tiedRef.current) return;
-
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        const landmarks = results.multiHandLandmarks[0];
-        const indexTip = landmarks[8];
-
-        if (indexTip) {
-          const x = indexTip.x * canvas.width;
-          const y = indexTip.y * canvas.height;
-
-          ctx.beginPath();
-          ctx.arc(x, y, 10, 0, 2 * Math.PI);
-          ctx.fillStyle = "#ff4757";
-          ctx.fill();
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = "#ffffff";
-          ctx.stroke();
-
-          const normalizedX = 1 - indexTip.x;
-          onMove(normalizedX * 100);
-
-          if (normalizedX > 0.65) {
-            onReachBrother();
-          }
-        }
-      }
-    });
-
-    if (videoRef.current) {
-      const camera = new CameraClass(videoRef.current, {
-        onFrame: async () => {
-          if (videoRef.current && !tiedRef.current) {
-            await hands.send({ image: videoRef.current });
-          }
-        },
-        width: 640,
-        height: 480,
-      });
-      camera.start();
-    }
-  }, [onMove, onReachBrother]);
-
   return (
-    <div style={styles.webcamContainer} className="webcam-box">
-      <div style={styles.liveIndicator}>
-        <span style={{ ...styles.redDot, backgroundColor: tied ? "#74b9ff" : "#2ed573" }} />
-        {tied ? "COMPLETED" : "FINGERTIP ACTIVE"}
+    <div style={styles.container}>
+      {/* Hidden processing video element with iOS inline play attributes */}
+      <video
+        ref={videoRef}
+        playsInline
+        muted
+        autoPlay
+        style={{ display: "none" }}
+      />
+
+      <div style={styles.badge}>
+        {cameraActive ? (
+          <>
+            <CameraIcon size={16} color="#2ed573" style={{ marginRight: 6 }} />
+            <span style={{ color: "#2ed573", fontWeight: "bold", fontSize: "0.8rem" }}>
+              Tracking Active
+            </span>
+          </>
+        ) : (
+          <>
+            <CameraOff size={16} color="#ff4757" style={{ marginRight: 6 }} />
+            <span style={{ color: "#ff4757", fontWeight: "bold", fontSize: "0.8rem" }}>
+              {errorMsg || "Starting Camera..."}
+            </span>
+          </>
+        )}
       </div>
-      <video ref={videoRef} style={styles.webcamVideo} playsInline muted />
-      <canvas ref={canvasRef} width="640" height="480" style={styles.canvasOverlay} />
     </div>
   );
 }
 
 const styles = {
-  webcamContainer: {
-    position: "relative",
-    width: "220px",
-    height: "145px",
-    borderRadius: "14px",
-    overflow: "hidden",
-    border: "3px solid rgba(255, 255, 255, 0.9)",
-    boxShadow: "0 8px 20px rgba(0, 0, 0, 0.15)",
-    background: "#000",
-    flexShrink: 0,
-  },
-  webcamVideo: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    transform: "scaleX(-1)",
-  },
-  canvasOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: "100%",
-    pointerEvents: "none",
-    transform: "scaleX(-1)",
-  },
-  liveIndicator: {
-    position: "absolute",
-    top: "6px",
-    left: "8px",
-    fontSize: "0.6rem",
-    fontWeight: "bold",
-    color: "#fff",
-    background: "rgba(0, 0, 0, 0.65)",
-    padding: "3px 8px",
-    borderRadius: "10px",
+  container: {
     display: "flex",
     alignItems: "center",
-    gap: "4px",
-    zIndex: 2,
   },
-  redDot: {
-    width: "6px",
-    height: "6px",
-    borderRadius: "50%",
+  badge: {
+    display: "flex",
+    alignItems: "center",
+    background: "#ffffff",
+    padding: "6px 12px",
+    borderRadius: "20px",
+    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
   },
 };
