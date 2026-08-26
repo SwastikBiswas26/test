@@ -9,28 +9,37 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
   useEffect(() => {
     let camera = null;
     let hands = null;
+    let isCancelled = false;
 
     const initTracker = async () => {
+      // Poll until window.Hands and window.Camera are loaded from CDN
+      let retries = 0;
+      while ((!window.Hands || !window.Camera) && retries < 20) {
+        if (isCancelled) return;
+        await new Promise((r) => setTimeout(r, 200));
+        retries++;
+      }
+
+      const HandsClass = window.Hands;
+      const CameraClass = window.Camera;
+
+      if (!HandsClass || !CameraClass) {
+        setErrorMsg("Failed to load MediaPipe scripts.");
+        return;
+      }
+
       try {
-        const HandsClass = window.Hands;
-        const CameraClass = window.Camera;
-
-        if (!HandsClass || !CameraClass) {
-          setErrorMsg("MediaPipe scripts loading...");
-          return;
-        }
-
-        // 1. Initialize MediaPipe Hands optimized for performance
+        // 1. Initialize MediaPipe Hands
         hands = new HandsClass({
           locateFile: (file) =>
-            `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+            `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`,
         });
 
         hands.setOptions({
           maxNumHands: 1,
-          modelComplexity: 0, // 0 = Fast performance for mobile/web CPUs
-          minDetectionConfidence: 0.5,
-          minTrackingConfidence: 0.5,
+          modelComplexity: 0, // Fast performance
+          minDetectionConfidence: 0.4, // Lowered for easier tracking
+          minTrackingConfidence: 0.4,
         });
 
         hands.onResults((results) => {
@@ -38,7 +47,7 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
 
           if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
             const landmarks = results.multiHandLandmarks[0];
-            const indexFingerTip = landmarks[8]; // Landmark 8 is Index Finger Tip
+            const indexFingerTip = landmarks[8]; // Index finger tip
 
             if (indexFingerTip) {
               // Flip X coordinates (1 - x) to create a natural mirror effect
@@ -47,7 +56,7 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
 
               onMove(percentageX);
 
-              // Trigger Rakhi completion when hand moves across 75% of screen width
+              // Trigger when hand reaches 75%
               if (percentageX >= 75) {
                 onReachBrother();
               }
@@ -66,16 +75,21 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
             },
           });
 
+          if (isCancelled) {
+            stream.getTracks().forEach((track) => track.stop());
+            return;
+          }
+
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
 
             videoRef.current.onloadedmetadata = () => {
-              videoRef.current.play();
+              videoRef.current.play().catch(() => {});
               setCameraActive(true);
 
               camera = new CameraClass(videoRef.current, {
                 onFrame: async () => {
-                  if (videoRef.current) {
+                  if (videoRef.current && hands) {
                     await hands.send({ image: videoRef.current });
                   }
                 },
@@ -86,7 +100,7 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
             };
           }
         } else {
-          setErrorMsg("Camera access not supported or blocked (Requires HTTPS).");
+          setErrorMsg("Camera access not supported (Requires HTTPS).");
         }
       } catch (err) {
         console.error("Webcam Error:", err);
@@ -97,8 +111,13 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
     initTracker();
 
     return () => {
-      if (camera) camera.stop();
-      if (hands) hands.close();
+      isCancelled = true;
+      if (camera) {
+        try { camera.stop(); } catch (e) {}
+      }
+      if (hands) {
+        try { hands.close(); } catch (e) {}
+      }
       if (videoRef.current && videoRef.current.srcObject) {
         const tracks = videoRef.current.srcObject.getTracks();
         tracks.forEach((track) => track.stop());
@@ -108,7 +127,6 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
 
   return (
     <div style={styles.container}>
-      {/* Visible Floating Camera Preview Feed */}
       <video
         ref={videoRef}
         playsInline
@@ -150,7 +168,7 @@ const styles = {
     height: "105px",
     borderRadius: "12px",
     objectFit: "cover",
-    transform: "scaleX(-1)", // Mirrors the video for natural preview motion
+    transform: "scaleX(-1)",
     boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
     border: "2px solid #ffffff",
     background: "#000000",
