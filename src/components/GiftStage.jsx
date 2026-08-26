@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import confetti from "canvas-confetti";
-import { Gift, RefreshCw } from "lucide-react";
+import { Gift, RefreshCw, Maximize, Minimize } from "lucide-react";
 
 export default function GiftStage({ onReset }) {
   const [isOpened, setIsOpened] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const isOpenedRef = useRef(isOpened);
@@ -11,6 +12,40 @@ export default function GiftStage({ onReset }) {
   useEffect(() => {
     isOpenedRef.current = isOpened;
   }, [isOpened]);
+
+  // Track fullscreen changes (e.g., when exiting via swipe or back button)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = () => {
+    const docEl = document.documentElement;
+
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen().catch((err) => console.log(err));
+      } else if (docEl.webkitRequestFullscreen) {
+        /* Safari / iOS support */
+        docEl.webkitRequestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+    }
+  };
 
   useEffect(() => {
     const HandsClass = window.Hands;
@@ -27,8 +62,8 @@ export default function GiftStage({ onReset }) {
     hands.setOptions({
       maxNumHands: 1,
       modelComplexity: 1,
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.6,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5,
     });
 
     hands.onResults((results) => {
@@ -38,7 +73,6 @@ export default function GiftStage({ onReset }) {
       if (!canvas) return;
       const ctx = canvas.getContext("2d");
 
-      // Maintain correct aspect ratio rendering for canvas overlay
       if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
         canvas.width = canvas.clientWidth;
         canvas.height = canvas.clientHeight;
@@ -66,10 +100,10 @@ export default function GiftStage({ onReset }) {
           const normalizedY = indexTip.y;
 
           if (
-            normalizedX > 0.35 &&
-            normalizedX < 0.65 &&
-            normalizedY > 0.35 &&
-            normalizedY < 0.65
+            normalizedX > 0.20 &&
+            normalizedX < 0.80 &&
+            normalizedY > 0.20 &&
+            normalizedY < 0.80
           ) {
             handleOpenGift();
           }
@@ -84,8 +118,8 @@ export default function GiftStage({ onReset }) {
             await hands.send({ image: videoRef.current });
           }
         },
-        width: 640,
-        height: 480,
+        width: 480,
+        height: 360,
       });
       cameraInstance.start();
     }
@@ -117,21 +151,31 @@ export default function GiftStage({ onReset }) {
           .gift-header {
             flex-direction: column-reverse !important;
             align-items: center !important;
-            padding: 10px 14px !important;
-            gap: 8px !important;
+            padding: 8px 12px !important;
+            gap: 6px !important;
           }
           .gift-webcam {
-            width: 130px !important;
-            height: 85px !important;
+            width: 110px !important;
+            height: 75px !important;
           }
           .gift-prompt {
             text-align: center !important;
-            font-size: 0.9rem !important;
+            font-size: 0.85rem !important;
+          }
+          .gift-box-wrapper {
+            width: 120px !important;
+            height: 120px !important;
+            margin: 16px 0 !important;
           }
         }
       `}</style>
 
-      {/* Responsive Header Bar */}
+      {/* Fullscreen Floating Toggle Button */}
+      <button style={styles.fullscreenBtn} onClick={toggleFullscreen} title="Toggle Fullscreen">
+        {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+      </button>
+
+      {/* Header Bar */}
       <header style={styles.header} className="gift-header">
         <h2 style={styles.promptText} className="gift-prompt">
           {isOpened
@@ -150,26 +194,25 @@ export default function GiftStage({ onReset }) {
             {isOpened ? "OPENED" : "ACTIVE"}
           </div>
           <video ref={videoRef} style={styles.webcamVideo} playsInline muted />
-          <canvas
-            ref={canvasRef}
-            style={styles.canvasOverlay}
-          />
+          <canvas ref={canvasRef} style={styles.canvasOverlay} />
         </div>
       </header>
 
-      {/* Main Interactive Gift Screen */}
+      {/* Gift Box */}
       <div
+        className="gift-box-wrapper"
         style={{
           ...styles.giftBox,
-          transform: isOpened ? "scale(1.1) rotate(5deg)" : "scale(1)",
+          transform: isOpened ? "scale(1.05) rotate(4deg)" : "scale(1)",
         }}
         onClick={handleOpenGift}
       >
         <div style={styles.ribbonVertical} />
         <div style={styles.ribbonHorizontal} />
-        <Gift size={isOpened ? 80 : 65} color="#ffffff" style={styles.icon} />
+        <Gift size={isOpened ? 70 : 55} color="#ffffff" style={styles.icon} />
       </div>
 
+      {/* Reward Card */}
       {isOpened && (
         <div style={styles.rewardCard}>
           <h3 style={styles.rewardTitle}>Special Blessing & Gift ✨</h3>
@@ -190,7 +233,7 @@ const styles = {
     position: "fixed",
     top: 0,
     left: 0,
-    width: "100vw",
+    width: "100%",
     height: "100dvh",
     backgroundColor: "#ffffff",
     zIndex: 9999,
@@ -198,25 +241,43 @@ const styles = {
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "16px",
+    padding: "12px",
     boxSizing: "border-box",
     overflowY: "auto",
+    WebkitOverflowScrolling: "touch",
+  },
+  fullscreenBtn: {
+    position: "absolute",
+    top: "12px",
+    right: "12px",
+    zIndex: 10000,
+    backgroundColor: "rgba(45, 52, 54, 0.85)",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "50%",
+    width: "36px",
+    height: "36px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
   },
   header: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: "16px",
+    gap: "12px",
     width: "100%",
     maxWidth: "850px",
     background: "rgba(248, 249, 250, 0.95)",
-    padding: "12px 20px",
-    borderRadius: "20px",
-    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.08)",
+    padding: "10px 16px",
+    borderRadius: "16px",
+    boxShadow: "0 4px 16px rgba(0, 0, 0, 0.06)",
     boxSizing: "border-box",
   },
   promptText: {
-    fontSize: "clamp(0.95rem, 2.5vw, 1.3rem)",
+    fontSize: "clamp(0.85rem, 2.5vw, 1.2rem)",
     color: "#2d3436",
     fontWeight: "bold",
     textAlign: "left",
@@ -224,12 +285,12 @@ const styles = {
   },
   webcamContainer: {
     position: "relative",
-    width: "180px",
-    height: "115px",
-    borderRadius: "14px",
+    width: "150px",
+    height: "100px",
+    borderRadius: "12px",
     overflow: "hidden",
-    border: "3px solid rgba(255, 255, 255, 0.9)",
-    boxShadow: "0 8px 20px rgba(0, 0, 0, 0.15)",
+    border: "2px solid rgba(255, 255, 255, 0.9)",
+    boxShadow: "0 4px 14px rgba(0, 0, 0, 0.12)",
     background: "#000",
     flexShrink: 0,
   },
@@ -250,87 +311,89 @@ const styles = {
   },
   liveIndicator: {
     position: "absolute",
-    top: "6px",
-    left: "8px",
-    fontSize: "0.55rem",
+    top: "4px",
+    left: "6px",
+    fontSize: "0.5rem",
     fontWeight: "bold",
     color: "#fff",
     background: "rgba(0, 0, 0, 0.65)",
-    padding: "3px 8px",
-    borderRadius: "10px",
+    padding: "2px 6px",
+    borderRadius: "8px",
     display: "flex",
     alignItems: "center",
     gap: "4px",
     zIndex: 2,
   },
   redDot: {
-    width: "6px",
-    height: "6px",
+    width: "5px",
+    height: "5px",
     borderRadius: "50%",
   },
   giftBox: {
-    width: "150px",
-    height: "150px",
+    width: "140px",
+    height: "140px",
     backgroundColor: "#ff4757",
-    borderRadius: "20px",
+    borderRadius: "18px",
     position: "relative",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    boxShadow: "0 12px 30px rgba(255, 71, 87, 0.4)",
+    boxShadow: "0 10px 24px rgba(255, 71, 87, 0.35)",
     cursor: "pointer",
-    transition: "transform 0.4s ease",
-    margin: "24px 0",
+    transition: "transform 0.3s ease",
+    margin: "16px 0",
+    flexShrink: 0,
   },
   ribbonVertical: {
     position: "absolute",
-    width: "24px",
+    width: "20px",
     height: "100%",
     backgroundColor: "#ffa502",
-    borderRadius: "4px",
+    borderRadius: "3px",
   },
   ribbonHorizontal: {
     position: "absolute",
-    height: "24px",
+    height: "20px",
     width: "100%",
     backgroundColor: "#ffa502",
-    borderRadius: "4px",
+    borderRadius: "3px",
   },
   icon: {
     zIndex: 2,
   },
   rewardCard: {
-    marginBottom: "16px",
-    padding: "16px 24px",
-    borderRadius: "16px",
+    margin: "8px 0 12px 0",
+    padding: "14px 18px",
+    borderRadius: "14px",
     background: "#f8f9fa",
-    boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+    boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
     textAlign: "center",
-    maxWidth: "400px",
+    maxWidth: "380px",
     width: "100%",
     boxSizing: "border-box",
   },
   rewardTitle: {
     color: "#2ed573",
-    fontSize: "1.1rem",
+    fontSize: "1rem",
     fontWeight: "bold",
-    marginBottom: "6px",
+    marginBottom: "4px",
   },
   rewardText: {
     color: "#636e72",
-    fontSize: "0.88rem",
-    marginBottom: "14px",
+    fontSize: "0.82rem",
+    marginBottom: "12px",
   },
   resetBtn: {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "10px 20px",
+    padding: "8px 16px",
     backgroundColor: "#2d3436",
     color: "#ffffff",
     border: "none",
     borderRadius: "8px",
     cursor: "pointer",
     fontWeight: "bold",
+    fontSize: "0.85rem",
   },
 };
