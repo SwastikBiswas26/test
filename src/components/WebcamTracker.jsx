@@ -3,6 +3,7 @@ import { Camera as CameraIcon, CameraOff } from "lucide-react";
 
 export default function WebcamTracker({ onMove, onReachBrother, tied }) {
   const videoRef = useRef(null);
+  const canvasRef = useRef(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -14,7 +15,7 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
     const initTracker = async () => {
       // Poll until window.Hands and window.Camera are loaded from CDN
       let retries = 0;
-      while ((!window.Hands || !window.Camera) && retries < 20) {
+      while ((!window.Hands || !window.Camera) && retries < 25) {
         if (isCancelled) return;
         await new Promise((r) => setTimeout(r, 200));
         retries++;
@@ -29,42 +30,66 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
       }
 
       try {
-        // 1. Initialize MediaPipe Hands
         hands = new HandsClass({
           locateFile: (file) =>
-            `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`,
+            `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
         });
 
         hands.setOptions({
           maxNumHands: 1,
-          modelComplexity: 0, // Fast performance
-          minDetectionConfidence: 0.4, // Lowered for easier tracking
-          minTrackingConfidence: 0.4,
+          modelComplexity: 0, 
+          minDetectionConfidence: 0.3, 
+          minTrackingConfidence: 0.3,
         });
 
         hands.onResults((results) => {
           if (tied) return;
 
-          if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-            const landmarks = results.multiHandLandmarks[0];
-            const indexFingerTip = landmarks[8]; // Index finger tip
+          // Draw fingertip animation indicator on canvas overlay
+          const canvas = canvasRef.current;
+          if (canvas) {
+            const ctx = canvas.getContext("2d");
+            if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+              canvas.width = canvas.clientWidth;
+              canvas.height = canvas.clientHeight;
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            if (indexFingerTip) {
-              // Flip X coordinates (1 - x) to create a natural mirror effect
-              const mirroredX = 1 - indexFingerTip.x;
-              const percentageX = Math.min(Math.max(mirroredX * 100, 0), 100);
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+              const landmarks = results.multiHandLandmarks[0];
+              const targetPoint = landmarks[8] || landmarks[9]; // Index tip / fallback palm
 
-              onMove(percentageX);
+              if (targetPoint) {
+                // Draw moving dot on fingertip position
+                const x = targetPoint.x * canvas.width;
+                const y = targetPoint.y * canvas.height;
 
-              // Trigger when hand reaches 75%
-              if (percentageX >= 75) {
-                onReachBrother();
+                ctx.beginPath();
+                ctx.arc(x, y, 6, 0, 2 * Math.PI);
+                ctx.fillStyle = "#ff4757";
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = "#ffffff";
+                ctx.stroke();
+
+                // Movement calculation
+                const mirroredX = 1 - targetPoint.x;
+                const minBound = 0.15;
+                const maxBound = 0.85;
+                
+                const normalizedX = (mirroredX - minBound) / (maxBound - minBound);
+                const percentageX = Math.min(Math.max(normalizedX * 100, 0), 100);
+
+                onMove(percentageX);
+
+                if (percentageX >= 98) {
+                  onReachBrother();
+                }
               }
             }
           }
         });
 
-        // 2. Request Camera Stream
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
@@ -89,7 +114,7 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
 
               camera = new CameraClass(videoRef.current, {
                 onFrame: async () => {
-                  if (videoRef.current && hands) {
+                  if (videoRef.current && hands && !isCancelled) {
                     await hands.send({ image: videoRef.current });
                   }
                 },
@@ -127,13 +152,16 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
 
   return (
     <div style={styles.container}>
-      <video
-        ref={videoRef}
-        playsInline
-        muted
-        autoPlay
-        style={styles.videoPreview}
-      />
+      <div style={styles.videoWrapper}>
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          autoPlay
+          style={styles.videoPreview}
+        />
+        <canvas ref={canvasRef} style={styles.canvasOverlay} />
+      </div>
 
       <div style={styles.badge}>
         {cameraActive ? (
@@ -163,15 +191,30 @@ const styles = {
     alignItems: "flex-end",
     gap: "8px",
   },
-  videoPreview: {
+  videoWrapper: {
+    position: "relative",
     width: "140px",
     height: "105px",
     borderRadius: "12px",
-    objectFit: "cover",
-    transform: "scaleX(-1)",
+    overflow: "hidden",
     boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
     border: "2px solid #ffffff",
     background: "#000000",
+  },
+  videoPreview: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    transform: "scaleX(-1)",
+  },
+  canvasOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    pointerEvents: "none",
+    transform: "scaleX(-1)",
   },
   badge: {
     display: "flex",

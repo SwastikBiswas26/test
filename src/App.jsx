@@ -19,6 +19,7 @@ export default function App() {
   );
   const [showCard, setShowCard] = useState(false);
   const [showGiftStage, setShowGiftStage] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
 
   const sisterRef = useRef(null);
   const brotherRef = useRef(null);
@@ -32,30 +33,58 @@ export default function App() {
       const sisterRect = sisterRef.current.getBoundingClientRect();
       const brotherRect = brotherRef.current.getBoundingClientRect();
 
-      // Distance to left side + full width of Brother + 10px offset to stand right next to him
-      const distanceToCross = (brotherRect.left - sisterRect.left) + brotherRect.width + 10;
+      const distanceToCross = (brotherRect.left - sisterRect.left) + brotherRect.width + 15;
       maxDistanceRef.current = Math.max(0, distanceToCross);
     }
   };
 
   useEffect(() => {
-    updateMaxDistance();
+    if (!showNameSetup) {
+      updateMaxDistance();
+      const timer = setTimeout(() => {
+        setIsCameraReady(true);
+      }, 600);
+      return () => clearTimeout(timer);
+    }
     window.addEventListener("resize", updateMaxDistance);
     return () => window.removeEventListener("resize", updateMaxDistance);
   }, [showNameSetup]);
 
-  // Smooth Interpolation (LERP Loop) for 60 FPS motion
+  const handleReachBrother = () => {
+    if (!tied) {
+      setTied(true);
+      targetXRef.current = maxDistanceRef.current; // Lock to the right side
+
+      confetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { y: 0.6 },
+        colors: ["#ff4757", "#2ed573", "#ffa502", "#70a1ff"],
+      });
+      setTimeout(() => setShowCard(true), 800);
+    }
+  };
+
+  // Smooth Interpolation (LERP Loop) for 60 FPS motion & auto-trigger check
   useEffect(() => {
     let animationFrameId;
 
     const updatePosition = () => {
-      currentXRef.current += (targetXRef.current - currentXRef.current) * 0.15;
+      if (!tied) {
+        currentXRef.current += (targetXRef.current - currentXRef.current) * 0.15;
+
+        // Auto-trigger if she reaches very close to max distance via finger movement
+        if (maxDistanceRef.current > 0 && currentXRef.current >= maxDistanceRef.current - 5) {
+          currentXRef.current = maxDistanceRef.current;
+          handleReachBrother();
+        }
+      } else {
+        // Snap directly to final position once tied
+        currentXRef.current = maxDistanceRef.current;
+      }
 
       if (sisterRef.current) {
-        sisterRef.current.style.setProperty(
-          "--sister-x",
-          `${currentXRef.current}px`
-        );
+        sisterRef.current.style.transform = `translateX(${currentXRef.current}px)`;
       }
 
       animationFrameId = requestAnimationFrame(updatePosition);
@@ -63,7 +92,7 @@ export default function App() {
 
     animationFrameId = requestAnimationFrame(updatePosition);
     return () => cancelAnimationFrame(animationFrameId);
-  }, []);
+  }, [tied]);
 
   const handleSaveNames = (e) => {
     e.preventDefault();
@@ -74,24 +103,21 @@ export default function App() {
   };
 
   const handleWebcamMove = (percentageX) => {
-    if (tied || showNameSetup) return;
-    // Map webcam movement percentage (0 - 100) directly to crossing distance
-    targetXRef.current = (percentageX / 100) * maxDistanceRef.current;
-  };
+    if (tied || showNameSetup || !isCameraReady || maxDistanceRef.current === 0) return;
+    
+    // Clamp percentage between 0 and 100 so it doesn't overshoot
+    const clampedPercentage = Math.max(0, Math.min(100, percentageX));
 
-  const handleReachBrother = () => {
-    if (!tied && !showNameSetup) {
-      setTied(true);
-      // Lock sister position on the right side of Brother upon arrival
-      targetXRef.current = maxDistanceRef.current;
+    // Ignore sudden full-scale jumps on initial calibration frames
+    if (clampedPercentage > 95 && currentXRef.current < maxDistanceRef.current * 0.2) {
+      return; 
+    }
 
-      confetti({
-        particleCount: 120,
-        spread: 80,
-        origin: { y: 0.6 },
-        colors: ["#ff4757", "#2ed573", "#ffa502", "#70a1ff"],
-      });
-      setTimeout(() => setShowCard(true), 800);
+    targetXRef.current = (clampedPercentage / 100) * maxDistanceRef.current;
+
+    // If user reaches full stretch via webcam
+    if (clampedPercentage >= 98) {
+      handleReachBrother();
     }
   };
 
@@ -111,7 +137,6 @@ export default function App() {
     <div style={styles.container}>
       <SunBackground />
 
-      {/* Initial First-Time Name Setup Form Modal */}
       {showNameSetup && (
         <div style={styles.setupOverlay}>
           <form style={styles.setupCard} onSubmit={handleSaveNames}>
@@ -178,23 +203,25 @@ export default function App() {
           {tied && <RakhiThreadOverlay />}
 
           <div style={styles.gameGrid}>
-            <Stickman
-              containerRef={sisterRef}
-              name={sisterName}
-              strokeColor="#d63031"
-              isTied={tied}
-              showRakhi={false}
-            />
+            <div ref={sisterRef} style={{ willChange: "transform" }}>
+              <Stickman
+                name={sisterName}
+                strokeColor="#d63031"
+                isTied={tied}
+                showRakhi={false}
+              />
+            </div>
 
             <div style={styles.threadZone} />
 
-            <Stickman
-              containerRef={brotherRef}
-              name={brotherName}
-              strokeColor="#0984e3"
-              isTied={tied}
-              showRakhi={true}
-            />
+            <div ref={brotherRef}>
+              <Stickman
+                name={brotherName}
+                strokeColor="#0984e3"
+                isTied={tied}
+                showRakhi={true}
+              />
+            </div>
           </div>
 
           <div style={styles.dinoGround}>
@@ -351,7 +378,6 @@ const styles = {
     color: "#636e72",
     marginTop: "4px",
     fontWeight: "600",
-    lineHeight: "1.2",
   },
   stage: {
     width: "100%",
