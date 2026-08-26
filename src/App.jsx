@@ -159,7 +159,6 @@ export default function App() {
             <Stickman
               containerRef={sisterRef}
               name={sisterName}
-              setName={setSisterName}
               strokeColor="#d63031"
               isTied={tied}
               showRakhi={false}
@@ -169,7 +168,6 @@ export default function App() {
 
             <Stickman
               name={brotherName}
-              setName={setBrotherName}
               strokeColor="#0984e3"
               isTied={tied}
               showRakhi={true}
@@ -201,33 +199,33 @@ const styles = {
   container: {
     display: "flex",
     flexDirection: "column",
-    height: "100vh",
+    minHeight: "100dvh",
     width: "100vw",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "10px",
+    padding: "12px 16px",
     boxSizing: "border-box",
     position: "relative",
-    overflow: "hidden",
+    overflowX: "hidden",
   },
   setupOverlay: {
     position: "fixed",
     top: 0,
     left: 0,
     width: "100vw",
-    height: "100vh",
+    height: "100dvh",
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     backdropFilter: "blur(6px)",
     zIndex: 10000,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "20px",
+    padding: "16px",
     boxSizing: "border-box",
   },
   setupCard: {
     background: "#ffffff",
-    padding: "28px 24px",
+    padding: "24px 20px",
     borderRadius: "24px",
     maxWidth: "380px",
     width: "100%",
@@ -295,15 +293,17 @@ const styles = {
   },
   header: {
     display: "flex",
+    flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: "20px",
-    width: "95%",
+    gap: "12px",
+    width: "100%",
     maxWidth: "850px",
     zIndex: 2,
-    marginTop: "10px",
-    background: "rgba(255, 255, 255, 0.8)",
-    padding: "12px 24px",
+    marginTop: "6px",
+    background: "rgba(255, 255, 255, 0.85)",
+    padding: "12px 16px",
     borderRadius: "20px",
     backdropFilter: "blur(10px)",
     boxShadow: "0 8px 24px rgba(0, 0, 0, 0.08)",
@@ -313,9 +313,10 @@ const styles = {
     flexDirection: "column",
     alignItems: "flex-start",
     textAlign: "left",
+    flex: "1 1 180px",
   },
   title: {
-    fontSize: "clamp(1.2rem, 4vw, 2rem)",
+    fontSize: "clamp(1.1rem, 4vw, 1.8rem)",
     display: "flex",
     alignItems: "center",
     color: "#2d3436",
@@ -323,10 +324,11 @@ const styles = {
     margin: 0,
   },
   subtitle: {
-    fontSize: "clamp(0.75rem, 2.5vw, 0.95rem)",
+    fontSize: "clamp(0.75rem, 2.8vw, 0.9rem)",
     color: "#636e72",
     marginTop: "4px",
     fontWeight: "600",
+    lineHeight: "1.2",
   },
   stage: {
     width: "100%",
@@ -335,7 +337,7 @@ const styles = {
     flexDirection: "column",
     alignItems: "center",
     zIndex: 2,
-    marginBottom: "20px",
+    margin: "auto 0 12px 0",
   },
   interactiveArea: {
     position: "relative",
@@ -352,11 +354,11 @@ const styles = {
     justifyItems: "center",
     marginBottom: "0px",
   },
-  threadZone: { width: "100px" },
+  threadZone: { width: "15vw" },
   dinoGround: {
     width: "100vw",
     marginLeft: "calc(-50vw + 50%)",
-    height: "20px",
+    height: "16px",
     background: "#2ed573",
     position: "relative",
     boxShadow: "0 -2px 10px rgba(46, 213, 115, 0.3)",
@@ -364,6 +366,6 @@ const styles = {
   groundLine: {
     width: "100%",
     height: "100%",
-    borderTop: "4px dashed #26de81",
+    borderTop: "3px dashed #26de81",
   },
 };

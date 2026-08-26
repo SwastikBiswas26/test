@@ -15,6 +15,7 @@ export default function GiftStage({ onReset }) {
   useEffect(() => {
     const HandsClass = window.Hands;
     const CameraClass = window.Camera;
+    let cameraInstance = null;
 
     if (!HandsClass || !CameraClass) return;
 
@@ -36,6 +37,13 @@ export default function GiftStage({ onReset }) {
       const canvas = canvasRef.current;
       if (!canvas) return;
       const ctx = canvas.getContext("2d");
+
+      // Maintain correct aspect ratio rendering for canvas overlay
+      if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+      }
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
@@ -47,10 +55,10 @@ export default function GiftStage({ onReset }) {
           const y = indexTip.y * canvas.height;
 
           ctx.beginPath();
-          ctx.arc(x, y, 10, 0, 2 * Math.PI);
+          ctx.arc(x, y, 8, 0, 2 * Math.PI);
           ctx.fillStyle = "#ff4757";
           ctx.fill();
-          ctx.lineWidth = 3;
+          ctx.lineWidth = 2;
           ctx.strokeStyle = "#ffffff";
           ctx.stroke();
 
@@ -70,7 +78,7 @@ export default function GiftStage({ onReset }) {
     });
 
     if (videoRef.current) {
-      const camera = new CameraClass(videoRef.current, {
+      cameraInstance = new CameraClass(videoRef.current, {
         onFrame: async () => {
           if (videoRef.current && !isOpenedRef.current) {
             await hands.send({ image: videoRef.current });
@@ -79,8 +87,15 @@ export default function GiftStage({ onReset }) {
         width: 640,
         height: 480,
       });
-      camera.start();
+      cameraInstance.start();
     }
+
+    return () => {
+      if (cameraInstance) {
+        cameraInstance.stop();
+      }
+      hands.close();
+    };
   }, []);
 
   const handleOpenGift = () => {
@@ -106,12 +121,12 @@ export default function GiftStage({ onReset }) {
             gap: 8px !important;
           }
           .gift-webcam {
-            width: 140px !important;
-            height: 90px !important;
+            width: 130px !important;
+            height: 85px !important;
           }
           .gift-prompt {
             text-align: center !important;
-            font-size: 0.95rem !important;
+            font-size: 0.9rem !important;
           }
         }
       `}</style>
@@ -137,8 +152,6 @@ export default function GiftStage({ onReset }) {
           <video ref={videoRef} style={styles.webcamVideo} playsInline muted />
           <canvas
             ref={canvasRef}
-            width="640"
-            height="480"
             style={styles.canvasOverlay}
           />
         </div>
@@ -154,7 +167,7 @@ export default function GiftStage({ onReset }) {
       >
         <div style={styles.ribbonVertical} />
         <div style={styles.ribbonHorizontal} />
-        <Gift size={isOpened ? 90 : 70} color="#ffffff" style={styles.icon} />
+        <Gift size={isOpened ? 80 : 65} color="#ffffff" style={styles.icon} />
       </div>
 
       {isOpened && (
@@ -178,7 +191,7 @@ const styles = {
     top: 0,
     left: 0,
     width: "100vw",
-    height: "100vh",
+    height: "100dvh",
     backgroundColor: "#ffffff",
     zIndex: 9999,
     display: "flex",
@@ -187,6 +200,7 @@ const styles = {
     justifyContent: "space-between",
     padding: "16px",
     boxSizing: "border-box",
+    overflowY: "auto",
   },
   header: {
     display: "flex",
@@ -255,8 +269,8 @@ const styles = {
     borderRadius: "50%",
   },
   giftBox: {
-    width: "160px",
-    height: "160px",
+    width: "150px",
+    height: "150px",
     backgroundColor: "#ff4757",
     borderRadius: "20px",
     position: "relative",
@@ -266,18 +280,18 @@ const styles = {
     boxShadow: "0 12px 30px rgba(255, 71, 87, 0.4)",
     cursor: "pointer",
     transition: "transform 0.4s ease",
-    margin: "auto 0",
+    margin: "24px 0",
   },
   ribbonVertical: {
     position: "absolute",
-    width: "26px",
+    width: "24px",
     height: "100%",
     backgroundColor: "#ffa502",
     borderRadius: "4px",
   },
   ribbonHorizontal: {
     position: "absolute",
-    height: "26px",
+    height: "24px",
     width: "100%",
     backgroundColor: "#ffa502",
     borderRadius: "4px",
@@ -286,7 +300,7 @@ const styles = {
     zIndex: 2,
   },
   rewardCard: {
-    marginBottom: "20px",
+    marginBottom: "16px",
     padding: "16px 24px",
     borderRadius: "16px",
     background: "#f8f9fa",
