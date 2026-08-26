@@ -1,6 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Hands } from "@mediapipe/hands";
-import { Camera } from "@mediapipe/camera_utils";
 import { Camera as CameraIcon, CameraOff } from "lucide-react";
 
 export default function WebcamTracker({ onMove, onReachBrother, tied }) {
@@ -14,15 +12,23 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
 
     const initTracker = async () => {
       try {
-        // 1. Initialize MediaPipe Hands optimized for mobile performance
-        hands = new Hands({
+        const HandsClass = window.Hands;
+        const CameraClass = window.Camera;
+
+        if (!HandsClass || !CameraClass) {
+          setErrorMsg("MediaPipe scripts loading...");
+          return;
+        }
+
+        // 1. Initialize MediaPipe Hands
+        hands = new HandsClass({
           locateFile: (file) =>
             `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
         });
 
         hands.setOptions({
           maxNumHands: 1,
-          modelComplexity: 0, // 0 = Fast performance for mobile CPUs
+          modelComplexity: 0,
           minDetectionConfidence: 0.5,
           minTrackingConfidence: 0.5,
         });
@@ -32,16 +38,14 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
 
           if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
             const landmarks = results.multiHandLandmarks[0];
-            const indexFingerTip = landmarks[8]; // Landmark 8 is Index Finger Tip
+            const indexFingerTip = landmarks[8];
 
             if (indexFingerTip) {
-              // Flip X coordinates (1 - x) to create a natural mirror effect
               const mirroredX = 1 - indexFingerTip.x;
               const percentageX = Math.min(Math.max(mirroredX * 100, 0), 100);
 
               onMove(percentageX);
 
-              // Trigger Rakhi completion when hand moves across 75% of screen width
               if (percentageX >= 75) {
                 onReachBrother();
               }
@@ -49,7 +53,7 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
           }
         });
 
-        // 2. Request Mobile-Friendly Camera Stream (640x480 max resolution)
+        // 2. Request Camera Stream
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
@@ -62,13 +66,12 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
 
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
-            
-            // Wait for video metadata to load before starting MediaPipe Camera Loop
+
             videoRef.current.onloadedmetadata = () => {
               videoRef.current.play();
               setCameraActive(true);
 
-              camera = new Camera(videoRef.current, {
+              camera = new CameraClass(videoRef.current, {
                 onFrame: async () => {
                   if (videoRef.current) {
                     await hands.send({ image: videoRef.current });
@@ -103,7 +106,6 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
 
   return (
     <div style={styles.container}>
-      {/* Hidden processing video element with iOS inline play attributes */}
       <video
         ref={videoRef}
         playsInline
