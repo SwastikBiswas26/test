@@ -55,23 +55,23 @@ export default function Stickman({
           strokeLinecap="round"
         />
 
-        {/* Left Arm */}
+        {/* Left Arm - Sister (now on the right) extends her left arm back toward Brother */}
         <line
           x1="50"
           y1="70"
-          x2={showRakhi ? (isTied ? "15" : "30") : "25"}
-          y2={isTied ? "70" : "85"}
+          x2={!showRakhi ? (isTied ? "15" : "25") : "30"}
+          y2={isTied ? "75" : "85"}
           stroke={strokeColor}
           strokeWidth="4"
           strokeLinecap="round"
         />
 
-        {/* Right Arm - Extends far right when tied or reaching */}
+        {/* Right Arm - Brother (on the left) extends his right arm forward toward Sister */}
         <line
           x1="50"
           y1="70"
-          x2={!showRakhi ? (isTied ? "85" : "75") : "70"}
-          y2={isTied ? "70" : "85"}
+          x2={showRakhi ? (isTied ? "85" : "70") : "75"}
+          y2={isTied ? "75" : "85"}
           stroke={strokeColor}
           strokeWidth="4"
           strokeLinecap="round"
@@ -97,11 +97,11 @@ export default function Stickman({
           strokeLinecap="round"
         />
 
-        {/* Rakhi tied indicator on wrist */}
+        {/* Rakhi tied indicator on Brother's wrist */}
         {showRakhi && isTied && (
           <g>
-            <circle cx="15" cy="70" r="6" fill="#ff4757" />
-            <circle cx="15" cy="70" r="3" fill="#ffa502" />
+            <circle cx="85" cy="75" r="6" fill="#ff4757" />
+            <circle cx="85" cy="75" r="3" fill="#ffa502" />
           </g>
         )}
       </svg>

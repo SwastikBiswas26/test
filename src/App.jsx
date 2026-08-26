@@ -26,15 +26,15 @@ export default function App() {
   const targetXRef = useRef(0);
   const currentXRef = useRef(0);
 
-  // Recalculate exact pixel distance between Sister and Brother on resize / load
+  // Recalculate distance so Sister crosses Brother completely to stand on his RIGHT side
   const updateMaxDistance = () => {
     if (sisterRef.current && brotherRef.current) {
       const sisterRect = sisterRef.current.getBoundingClientRect();
       const brotherRect = brotherRef.current.getBoundingClientRect();
-      
-      // Calculate distance needed for Sister to reach/touch Brother's position
-      const distance = brotherRect.left - sisterRect.left;
-      maxDistanceRef.current = Math.max(0, distance);
+
+      // Distance to left side + full width of Brother + 10px offset to stand right next to him
+      const distanceToCross = (brotherRect.left - sisterRect.left) + brotherRect.width + 10;
+      maxDistanceRef.current = Math.max(0, distanceToCross);
     }
   };
 
@@ -75,14 +75,14 @@ export default function App() {
 
   const handleWebcamMove = (percentageX) => {
     if (tied || showNameSetup) return;
-    // Map webcam movement percentage (0 - 100) directly to exact touch distance
+    // Map webcam movement percentage (0 - 100) directly to crossing distance
     targetXRef.current = (percentageX / 100) * maxDistanceRef.current;
   };
 
   const handleReachBrother = () => {
     if (!tied && !showNameSetup) {
       setTied(true);
-      // Lock sister position right next to brother upon arrival
+      // Lock sister position on the right side of Brother upon arrival
       targetXRef.current = maxDistanceRef.current;
 
       confetti({
