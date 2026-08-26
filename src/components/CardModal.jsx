@@ -1,8 +1,15 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw } from "lucide-react";
+import { Heart } from "lucide-react";
 
-export default function CardModal({ showCard, sisterName, brotherName, message, setMessage, resetGame }) {
+export default function CardModal({
+  showCard,
+  sisterName,
+  brotherName,
+  message,
+  setMessage,
+  resetGame,
+}) {
   return (
     <AnimatePresence>
       {showCard && (
@@ -16,18 +23,20 @@ export default function CardModal({ showCard, sisterName, brotherName, message, 
             <h2 style={{ color: "#d63031", marginBottom: 8, fontSize: "1.3rem" }}>
               Happy Raksha Bandhan! 🧵✨
             </h2>
-            
+
             <p style={{ fontSize: "0.85rem", color: "#636e72", marginBottom: 12 }}>
-              From <strong>Brother</strong> to <strong>Sister 💕</strong>
+              From <strong>{sisterName}</strong> to <strong>{brotherName} 💕</strong>
             </p>
+
             <textarea
               style={styles.cardTextarea}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
             />
+
             <div style={styles.buttonGroup}>
               <button style={styles.resetBtn} onClick={resetGame}>
-                <RefreshCw size={14} style={{ marginRight: 6 }} /> Replay
+                <Heart size={14} style={{ marginRight: 6 }} fill="#ffffff" /> Take love
               </button>
             </div>
           </div>
@@ -82,13 +91,14 @@ const styles = {
   resetBtn: {
     display: "flex",
     alignItems: "center",
-    background: "#74b9ff",
+    background: "#ff4757",
     color: "#fff",
     border: "none",
-    padding: "6px 14px",
+    padding: "8px 16px",
     borderRadius: "8px",
     cursor: "pointer",
     fontSize: "0.85rem",
     fontWeight: "bold",
+    boxShadow: "0 4px 12px rgba(255, 71, 87, 0.3)",
   },
 };
