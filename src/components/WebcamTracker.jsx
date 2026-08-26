@@ -20,7 +20,7 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
           return;
         }
 
-        // 1. Initialize MediaPipe Hands
+        // 1. Initialize MediaPipe Hands optimized for performance
         hands = new HandsClass({
           locateFile: (file) =>
             `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
@@ -28,7 +28,7 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
 
         hands.setOptions({
           maxNumHands: 1,
-          modelComplexity: 0,
+          modelComplexity: 0, // 0 = Fast performance for mobile/web CPUs
           minDetectionConfidence: 0.5,
           minTrackingConfidence: 0.5,
         });
@@ -38,14 +38,16 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
 
           if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
             const landmarks = results.multiHandLandmarks[0];
-            const indexFingerTip = landmarks[8];
+            const indexFingerTip = landmarks[8]; // Landmark 8 is Index Finger Tip
 
             if (indexFingerTip) {
+              // Flip X coordinates (1 - x) to create a natural mirror effect
               const mirroredX = 1 - indexFingerTip.x;
               const percentageX = Math.min(Math.max(mirroredX * 100, 0), 100);
 
               onMove(percentageX);
 
+              // Trigger Rakhi completion when hand moves across 75% of screen width
               if (percentageX >= 75) {
                 onReachBrother();
               }
@@ -106,12 +108,13 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
 
   return (
     <div style={styles.container}>
+      {/* Visible Floating Camera Preview Feed */}
       <video
         ref={videoRef}
         playsInline
         muted
         autoPlay
-        style={{ display: "none" }}
+        style={styles.videoPreview}
       />
 
       <div style={styles.badge}>
@@ -138,7 +141,19 @@ export default function WebcamTracker({ onMove, onReachBrother, tied }) {
 const styles = {
   container: {
     display: "flex",
-    alignItems: "center",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: "8px",
+  },
+  videoPreview: {
+    width: "140px",
+    height: "105px",
+    borderRadius: "12px",
+    objectFit: "cover",
+    transform: "scaleX(-1)", // Mirrors the video for natural preview motion
+    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+    border: "2px solid #ffffff",
+    background: "#000000",
   },
   badge: {
     display: "flex",
