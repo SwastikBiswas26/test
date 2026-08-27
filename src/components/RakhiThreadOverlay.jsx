@@ -11,9 +11,9 @@ export default function RakhiThreadOverlay() {
         </linearGradient>
       </defs>
       <line
-        x1="38%"
+        x1="45%"
         y1="52%"
-        x2="63%"
+        x2="55%"
         y2="52%"
         stroke="url(#threadGrad)"
         strokeWidth="4"

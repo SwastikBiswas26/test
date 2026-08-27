@@ -27,24 +27,31 @@ export default function App() {
   const targetXRef = useRef(0);
   const currentXRef = useRef(0);
 
-  // Recalculate distance so Sister crosses Brother completely to stand on his RIGHT side
+  // Recalculate distance with a reliable fallback so it's never 0
   const updateMaxDistance = () => {
-    if (sisterRef.current && brotherRef.current) {
+    if (sisterRef.current && brotherRef.current && !tied) {
       const sisterRect = sisterRef.current.getBoundingClientRect();
       const brotherRect = brotherRef.current.getBoundingClientRect();
 
       const distanceToCross = (brotherRect.left - sisterRect.left) + brotherRect.width + 15;
-      maxDistanceRef.current = Math.max(0, distanceToCross);
+      if (distanceToCross > 50) {
+        maxDistanceRef.current = distanceToCross;
+        return;
+      }
+    }
+    if (!tied) {
+      maxDistanceRef.current = window.innerWidth * 0.45;
     }
   };
 
   useEffect(() => {
     if (!showNameSetup) {
       updateMaxDistance();
-      const timer = setTimeout(() => {
+      const t = setTimeout(() => {
+        updateMaxDistance();
         setIsCameraReady(true);
-      }, 600);
-      return () => clearTimeout(timer);
+      }, 300);
+      return () => clearTimeout(t);
     }
     window.addEventListener("resize", updateMaxDistance);
     return () => window.removeEventListener("resize", updateMaxDistance);
@@ -53,7 +60,7 @@ export default function App() {
   const handleReachBrother = () => {
     if (!tied) {
       setTied(true);
-      targetXRef.current = maxDistanceRef.current; // Lock to the right side
+      targetXRef.current = maxDistanceRef.current;
 
       confetti({
         particleCount: 120,
@@ -73,18 +80,18 @@ export default function App() {
       if (!tied) {
         currentXRef.current += (targetXRef.current - currentXRef.current) * 0.15;
 
-        // Auto-trigger if she reaches very close to max distance via finger movement
         if (maxDistanceRef.current > 0 && currentXRef.current >= maxDistanceRef.current - 5) {
           currentXRef.current = maxDistanceRef.current;
           handleReachBrother();
         }
       } else {
-        // Snap directly to final position once tied
-        currentXRef.current = maxDistanceRef.current;
+        // When tied, smoothly glide to final center meeting point offset
+        const targetCenterOffset = maxDistanceRef.current * 0.5;
+        currentXRef.current += (targetCenterOffset - currentXRef.current) * 0.1;
       }
 
       if (sisterRef.current) {
-        sisterRef.current.style.transform = `translateX(${currentXRef.current}px)`;
+        sisterRef.current.style.setProperty("--sister-x", `${currentXRef.current}px`);
       }
 
       animationFrameId = requestAnimationFrame(updatePosition);
@@ -98,24 +105,25 @@ export default function App() {
     e.preventDefault();
     if (sisterName.trim() && brotherName.trim()) {
       setShowNameSetup(false);
-      setTimeout(updateMaxDistance, 100);
+      setTimeout(updateMaxDistance, 50);
     }
   };
 
   const handleWebcamMove = (percentageX) => {
-    if (tied || showNameSetup || !isCameraReady || maxDistanceRef.current === 0) return;
+    if (tied || showNameSetup || !isCameraReady) return;
     
-    // Clamp percentage between 0 and 100 so it doesn't overshoot
+    if (!maxDistanceRef.current || maxDistanceRef.current === 0) {
+      updateMaxDistance();
+    }
+
     const clampedPercentage = Math.max(0, Math.min(100, percentageX));
 
-    // Ignore sudden full-scale jumps on initial calibration frames
-    if (clampedPercentage > 95 && currentXRef.current < maxDistanceRef.current * 0.2) {
+    if (clampedPercentage > 95 && currentXRef.current < maxDistanceRef.current * 0.1) {
       return; 
     }
 
     targetXRef.current = (clampedPercentage / 100) * maxDistanceRef.current;
 
-    // If user reaches full stretch via webcam
     if (clampedPercentage >= 98) {
       handleReachBrother();
     }
@@ -202,7 +210,11 @@ export default function App() {
         <div style={styles.interactiveArea}>
           {tied && <RakhiThreadOverlay />}
 
-          <div style={styles.gameGrid}>
+          <div style={{
+            ...styles.gameGrid,
+            maxWidth: tied ? "320px" : "100%",
+            margin: tied ? "0 auto" : "0",
+          }}>
             <div ref={sisterRef} style={{ willChange: "transform" }}>
               <Stickman
                 name={sisterName}
@@ -212,7 +224,10 @@ export default function App() {
               />
             </div>
 
-            <div style={styles.threadZone} />
+            <div style={{
+              ...styles.threadZone,
+              width: tied ? "30px" : "15vw",
+            }} />
 
             <div ref={brotherRef}>
               <Stickman
@@ -402,6 +417,7 @@ const styles = {
     alignItems: "end",
     justifyItems: "center",
     marginBottom: "0px",
+    transition: "all 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
   },
   threadZone: { width: "15vw" },
   dinoGround: {
