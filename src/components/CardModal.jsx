@@ -25,7 +25,7 @@ export default function CardModal({
             </h2>
 
             <p style={{ fontSize: "0.85rem", color: "#636e72", marginBottom: 12 }}>
-              From <strong>{brotherName}</strong> to <strong>{sisterName} 💕</strong>
+              From <strong>{sisterName}</strong> to <strong>{brotherName} 💕</strong>
             </p>
 
             <textarea
